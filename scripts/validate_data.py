@@ -50,10 +50,17 @@ REC_VOCABS = {
     "another_review_needed": {"yes", "no"}
 }
 
+REQUIRED_SECTIONS = [
+    "## Recommendation", "## Source", "## Exact Location", "## Supporting Excerpt",
+    "## Faithful Paraphrase", "## Required Context", "## Source Relationship",
+    "## Comparability Assessment", "## Unknowns or Ambiguities",
+    "## Claims This Source Does Not Support", "## Verification"
+]
+
 def parse_decimal(val):
-    if not val: return None
+    if not val.strip(): return None
     try:
-        d = Decimal(val)
+        d = Decimal(val.strip())
         if d.is_nan() or d.is_infinite():
             return None
         return d
@@ -61,9 +68,10 @@ def parse_decimal(val):
         return None
 
 def is_valid_date(val):
-    if not val: return False
+    v = val.strip()
+    if not v: return False
     try:
-        datetime.strptime(val, "%Y-%m-%d")
+        datetime.strptime(v, "%Y-%m-%d")
         return True
     except ValueError:
         return False
@@ -79,8 +87,9 @@ class Validator:
         self.ext_ids = set()
         self.source_verification = {}
         
-    def log_error(self, file, row, field, msg):
-        self.errors.append(f"{file} row {row} field '{field}': {msg}")
+    def log_error(self, file, row, id_val, field, msg):
+        disp_id = id_val.strip() if id_val.strip() else "<blank>"
+        self.errors.append(f"{file} row {row} (ID: {disp_id}) field '{field}': {msg}")
 
     def run(self):
         self.sources_rows = self.read_and_validate_header(self.sources_path, SOURCES_HEADER)
@@ -104,7 +113,6 @@ class Validator:
                 reader = csv.reader(f)
                 header = next(reader, None)
                 if header is None:
-                    # Empty file is rejected, header is required
                     self.errors.append(f"{path}: Missing headers.")
                     return None
                 if header != expected_header:
@@ -122,220 +130,292 @@ class Validator:
             return None
 
     def validate_source_row(self, row, row_idx):
-        src_id = row['source_id']
+        src_id = row['source_id'].strip()
         if not re.match(r"^SRC\d{4}$", src_id):
-            self.log_error(self.sources_path, row_idx, "source_id", "Invalid format")
+            self.log_error(self.sources_path, row_idx, src_id, "source_id", "Invalid format")
         if src_id in self.source_ids:
-            self.log_error(self.sources_path, row_idx, "source_id", "Duplicate ID")
-        self.source_ids.add(src_id)
+            self.log_error(self.sources_path, row_idx, src_id, "source_id", "Duplicate ID")
+        if src_id:
+            self.source_ids.add(src_id)
         
-        self.source_verification[src_id] = row['verification_status']
+        self.source_verification[src_id] = row['verification_status'].strip()
 
-        pub_year = row['publication_year']
-        if not re.match(r"^\d{4}$", pub_year):
-            self.log_error(self.sources_path, row_idx, "publication_year", "Must be 4-digit integer")
+        required_source_fields = [
+            "source_id", "organization", "document_title", "document_type",
+            "publication_year", "official_url", "access_date", "population_scope",
+            "geographic_scope", "source_status", "correction_status", "verification_status"
+        ]
+        
+        for field in required_source_fields:
+            if not row[field].strip():
+                self.log_error(self.sources_path, row_idx, src_id, field, "Cannot be blank")
 
-        if not is_valid_date(row['access_date']):
-            self.log_error(self.sources_path, row_idx, "access_date", "Invalid date format")
+        pub_year = row['publication_year'].strip()
+        if pub_year and not re.match(r"^\d{4}$", pub_year):
+            self.log_error(self.sources_path, row_idx, src_id, "publication_year", "Must be 4-digit integer")
+
+        if row['access_date'].strip() and not is_valid_date(row['access_date']):
+            self.log_error(self.sources_path, row_idx, src_id, "access_date", "Invalid date format")
 
         for field, vocab in SOURCE_VOCABS.items():
-            if row[field] not in vocab:
-                self.log_error(self.sources_path, row_idx, field, f"Value '{row[field]}' not in {vocab}")
+            val = row[field].strip()
+            if val and val not in vocab:
+                self.log_error(self.sources_path, row_idx, src_id, field, f"Value '{val}' not in {vocab}")
 
-        if row['document_type'] == 'other' and not row['source_notes']:
-            self.log_error(self.sources_path, row_idx, "source_notes", "Required when document_type is other")
+        if row['document_type'].strip() == 'other' and not row['source_notes'].strip():
+            self.log_error(self.sources_path, row_idx, src_id, "source_notes", "Required when document_type is other")
             
-        if row['geographic_scope'] == 'national' and not row['source_notes']:
-            self.log_error(self.sources_path, row_idx, "source_notes", "Required when geographic_scope is national")
+        if row['geographic_scope'].strip() == 'national' and not row['source_notes'].strip():
+            self.log_error(self.sources_path, row_idx, src_id, "source_notes", "Required when geographic_scope is national")
 
-        ups = row['upstream_source_ids']
+        ups = row['upstream_source_ids'].strip()
         if ups:
             for u in ups.split(';'):
+                u = u.strip()
                 if not re.match(r"^SRC\d{4}$", u):
-                    self.log_error(self.sources_path, row_idx, "upstream_source_ids", f"Invalid format '{u}'")
+                    self.log_error(self.sources_path, row_idx, src_id, "upstream_source_ids", f"Invalid format '{u}'")
                 elif u == src_id:
-                    self.log_error(self.sources_path, row_idx, "upstream_source_ids", "Self-referential")
+                    self.log_error(self.sources_path, row_idx, src_id, "upstream_source_ids", "Self-referential")
 
-        vstatus = row['verification_status']
-        h_ver_by = row['human_verified_by']
-        h_ver_date = row['human_verification_date']
+        vstatus = row['verification_status'].strip()
+        h_ver_by = row['human_verified_by'].strip()
+        h_ver_date = row['human_verification_date'].strip()
         if vstatus == 'verified':
             if not h_ver_by:
-                self.log_error(self.sources_path, row_idx, "human_verified_by", "Required when verified")
-            if not is_valid_date(h_ver_date):
-                self.log_error(self.sources_path, row_idx, "human_verification_date", "Required and valid date when verified")
+                self.log_error(self.sources_path, row_idx, src_id, "human_verified_by", "Required when verified")
+            if not is_valid_date(row['human_verification_date']):
+                self.log_error(self.sources_path, row_idx, src_id, "human_verification_date", "Required and valid date when verified")
         else:
             if h_ver_by or h_ver_date:
-                self.log_error(self.sources_path, row_idx, "human_verified_by", "Must be blank unless verified")
+                self.log_error(self.sources_path, row_idx, src_id, "human_verified_by", "Must be blank unless verified")
 
     def validate_rec_row(self, row, row_idx):
-        rec_id = row['recommendation_id']
+        rec_id = row['recommendation_id'].strip()
         if not re.match(r"^REC\d{4}$", rec_id):
-            self.log_error(self.recs_path, row_idx, "recommendation_id", "Invalid format")
+            self.log_error(self.recs_path, row_idx, rec_id, "recommendation_id", "Invalid format")
         if rec_id in self.rec_ids:
-            self.log_error(self.recs_path, row_idx, "recommendation_id", "Duplicate ID")
-        self.rec_ids.add(rec_id)
+            self.log_error(self.recs_path, row_idx, rec_id, "recommendation_id", "Duplicate ID")
+        if rec_id:
+            self.rec_ids.add(rec_id)
 
-        src_id = row['source_id']
-        if src_id not in self.source_ids:
-            self.log_error(self.recs_path, row_idx, "source_id", "Foreign key missing")
-            
-        ext_id = row['extraction_note_id']
-        if not re.match(r"^EXT\d{4}$", ext_id):
-            self.log_error(self.recs_path, row_idx, "extraction_note_id", "Invalid format")
-        if ext_id in self.ext_ids:
-            self.log_error(self.recs_path, row_idx, "extraction_note_id", "Duplicate ID")
-        self.ext_ids.add(ext_id)
+        required_rec_fields = [
+            "recommendation_id", "source_id", "extraction_note_id", "original_or_adapted",
+            "age_group", "therapy_direction", "treatment_phase", "analyte",
+            "recommendation_type", "comparison_operator", "specimen_timing",
+            "short_source_excerpt", "faithful_paraphrase", "required_context",
+            "claims_not_supported", "comparable_status", "extracted_by",
+            "extraction_date", "verification_status", "another_review_needed"
+        ]
         
-        self.check_evidence_note(ext_id, rec_id, row_idx)
+        for field in required_rec_fields:
+            if not row[field].strip():
+                self.log_error(self.recs_path, row_idx, rec_id, field, "Cannot be blank")
+        
+        src_id = row['source_id'].strip()
+        if src_id and src_id not in self.source_ids:
+            self.log_error(self.recs_path, row_idx, rec_id, "source_id", "Foreign key missing")
+            
+        ext_id = row['extraction_note_id'].strip()
+        if ext_id and not re.match(r"^EXT\d{4}$", ext_id):
+            self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Invalid format")
+        if ext_id in self.ext_ids:
+            self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Duplicate ID")
+        if ext_id:
+            self.ext_ids.add(ext_id)
+        
+        if ext_id and rec_id:
+            self.check_evidence_note(ext_id, rec_id, row_idx)
+            
+        ext_date = row['extraction_date'].strip()
+        if ext_date and not is_valid_date(ext_date):
+            self.log_error(self.recs_path, row_idx, rec_id, "extraction_date", "Invalid date format")
 
         for field, vocab in REC_VOCABS.items():
-            if row[field] not in vocab:
-                self.log_error(self.recs_path, row_idx, field, f"Value '{row[field]}' not in {vocab}")
+            val = row[field].strip()
+            if val and val not in vocab:
+                self.log_error(self.recs_path, row_idx, rec_id, field, f"Value '{val}' not in {vocab}")
 
-        oa = row['original_or_adapted']
-        up_id = row['upstream_source_id']
+        oa = row['original_or_adapted'].strip()
+        up_id = row['upstream_source_id'].strip()
         if oa in ('adapted', 'reproduced', 'derived'):
             if not up_id:
-                self.log_error(self.recs_path, row_idx, "upstream_source_id", f"Required when original_or_adapted is {oa}")
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", f"Required when original_or_adapted is {oa}")
             elif not re.match(r"^SRC\d{4}$", up_id):
-                self.log_error(self.recs_path, row_idx, "upstream_source_id", "Invalid format")
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Invalid format")
             elif up_id == src_id:
-                self.log_error(self.recs_path, row_idx, "upstream_source_id", "Self-referential")
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Self-referential")
             elif up_id not in self.source_ids:
-                self.log_error(self.recs_path, row_idx, "upstream_source_id", "Foreign key missing")
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Foreign key missing")
         elif oa in ('original', 'not_applicable'):
             if up_id:
-                self.log_error(self.recs_path, row_idx, "upstream_source_id", "Must be blank")
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Must be blank")
 
         numeric_fields = ["lower_bound", "upper_bound", "single_threshold"]
         has_numeric = False
         parsed_nums = {}
         for nf in numeric_fields:
-            val = row[nf]
+            val = row[nf].strip()
             if val:
                 d = parse_decimal(val)
                 if d is None:
-                    self.log_error(self.recs_path, row_idx, nf, "Invalid numeric value")
+                    self.log_error(self.recs_path, row_idx, rec_id, nf, "Invalid numeric value")
                 else:
                     has_numeric = True
                     parsed_nums[nf] = d
 
-        if has_numeric and not row['unit']:
-            self.log_error(self.recs_path, row_idx, "unit", "Required when numeric field populated")
+        if has_numeric and not row['unit'].strip():
+            self.log_error(self.recs_path, row_idx, rec_id, "unit", "Required when numeric field populated")
 
         # Structural rules
-        op = row['comparison_operator']
-        rt = row['recommendation_type']
+        op = row['comparison_operator'].strip()
+        rt = row['recommendation_type'].strip()
         
-        lb = row['lower_bound']
-        ub = row['upper_bound']
-        st = row['single_threshold']
+        lb = row['lower_bound'].strip()
+        ub = row['upper_bound'].strip()
+        st = row['single_threshold'].strip()
 
         if op == 'between':
             if not lb or not ub or st:
-                self.log_error(self.recs_path, row_idx, "comparison_operator", "between requires lower and upper bound, no single threshold")
+                self.log_error(self.recs_path, row_idx, rec_id, "comparison_operator", "between requires lower and upper bound, no single threshold")
             elif 'lower_bound' in parsed_nums and 'upper_bound' in parsed_nums:
                 if parsed_nums['lower_bound'] > parsed_nums['upper_bound']:
-                    self.log_error(self.recs_path, row_idx, "lower_bound", "greater than upper_bound")
+                    self.log_error(self.recs_path, row_idx, rec_id, "lower_bound", "greater than upper_bound")
         elif op in ('less_than', 'less_than_or_equal', 'greater_than', 'greater_than_or_equal'):
             if not st or lb or ub:
-                self.log_error(self.recs_path, row_idx, "comparison_operator", "single-sided requires only single_threshold")
+                self.log_error(self.recs_path, row_idx, rec_id, "comparison_operator", "single-sided requires only single_threshold")
         elif op == 'approximately':
             has_single = bool(st)
             has_both = bool(lb and ub)
             if not (has_single ^ has_both):
-                self.log_error(self.recs_path, row_idx, "comparison_operator", "approximately requires either single_threshold OR both bounds")
+                self.log_error(self.recs_path, row_idx, rec_id, "comparison_operator", "approximately requires either single_threshold OR both bounds")
         elif op in ('within_reference_range', 'not_applicable', 'not_specified'):
             if lb or ub or st:
-                self.log_error(self.recs_path, row_idx, "comparison_operator", f"{op} requires blank numeric fields")
+                self.log_error(self.recs_path, row_idx, rec_id, "comparison_operator", f"{op} requires blank numeric fields")
 
         if rt == 'target_interval' and op != 'between':
-            self.log_error(self.recs_path, row_idx, "recommendation_type", "target_interval requires between")
+            self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", "target_interval requires between")
         if rt == 'upper_threshold' and op not in ('less_than', 'less_than_or_equal'):
-            self.log_error(self.recs_path, row_idx, "recommendation_type", "upper_threshold requires less_than or less_than_or_equal")
+            self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", "upper_threshold requires less_than or less_than_or_equal")
         if rt == 'lower_threshold' and op not in ('greater_than', 'greater_than_or_equal'):
-            self.log_error(self.recs_path, row_idx, "recommendation_type", "lower_threshold requires greater_than or greater_than_or_equal")
-        if rt in ('physiologic_range', 'laboratory_reference_range') and op != 'within_reference_range':
-            self.log_error(self.recs_path, row_idx, "recommendation_type", f"{rt} requires within_reference_range")
-            
-        if rt in ('physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction'):
-            if not row['non_numeric_instruction']:
-                self.log_error(self.recs_path, row_idx, "non_numeric_instruction", f"Required for {rt}")
+            self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", "lower_threshold requires greater_than or greater_than_or_equal")
+        
+        qual_types = {'physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction', 'not_specified'}
+        if rt in qual_types:
+            if lb or ub or st:
+                self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", f"numeric fields must be blank for {rt}")
 
-        # Non-numeric operators numeric checking is inherently covered above.
+        if rt in ('physiologic_range', 'laboratory_reference_range') and op != 'within_reference_range':
+            self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", f"{rt} requires within_reference_range")
+            
+        req_non_numeric = {'physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction'}
+        if rt in req_non_numeric:
+            if not row['non_numeric_instruction'].strip():
+                self.log_error(self.recs_path, row_idx, rec_id, "non_numeric_instruction", f"Required for {rt}")
 
         # Verification rules
-        vstatus = row['verification_status']
-        h_ver_by = row['human_verified_by']
-        h_ver_date = row['human_verification_date']
+        vstatus = row['verification_status'].strip()
+        h_ver_by = row['human_verified_by'].strip()
+        h_ver_date = row['human_verification_date'].strip()
         
         if vstatus == 'verified':
             if not h_ver_by:
-                self.log_error(self.recs_path, row_idx, "human_verified_by", "Required when verified")
-            if not is_valid_date(h_ver_date):
-                self.log_error(self.recs_path, row_idx, "human_verification_date", "Required and valid date when verified")
+                self.log_error(self.recs_path, row_idx, rec_id, "human_verified_by", "Required when verified")
+            if not is_valid_date(row['human_verification_date']):
+                self.log_error(self.recs_path, row_idx, rec_id, "human_verification_date", "Required and valid date when verified")
             if src_id in self.source_verification and self.source_verification[src_id] != 'verified':
-                self.log_error(self.recs_path, row_idx, "verification_status", "Recommendation cannot be verified if source is not verified")
+                self.log_error(self.recs_path, row_idx, rec_id, "verification_status", "Recommendation cannot be verified if source is not verified")
         else:
             if h_ver_by or h_ver_date:
-                self.log_error(self.recs_path, row_idx, "human_verified_by", "Must be blank unless verified")
+                self.log_error(self.recs_path, row_idx, rec_id, "human_verified_by", "Must be blank unless verified")
 
-        comp = row['comparable_status']
-        cg = row['comparison_group']
-        cr = row['noncomparability_reason']
+        comp = row['comparable_status'].strip()
+        cg = row['comparison_group'].strip()
+        cr = row['noncomparability_reason'].strip()
         if comp == 'not_comparable' and not cr:
-            self.log_error(self.recs_path, row_idx, "noncomparability_reason", "Required when not_comparable")
+            self.log_error(self.recs_path, row_idx, rec_id, "noncomparability_reason", "Required when not_comparable")
         if comp in ('directly_comparable', 'comparable_with_qualification') and not cg:
-            self.log_error(self.recs_path, row_idx, "comparison_group", f"Required when {comp}")
+            self.log_error(self.recs_path, row_idx, rec_id, "comparison_group", f"Required when {comp}")
 
     def check_evidence_note(self, ext_id, rec_id, row_idx):
         path = os.path.join(self.evidence_dir, f"{ext_id}.md")
         if not os.path.isfile(path):
-            self.log_error(self.recs_path, row_idx, "extraction_note_id", f"Evidence note missing: {path}")
+            self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Evidence note missing: {path}")
             return
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
-                content = f.read()
+                lines = f.readlines()
             
-            if f"# Extraction Note: {ext_id}" not in content:
-                self.log_error(self.recs_path, row_idx, "extraction_note_id", "Evidence note missing correct # Extraction Note title")
+            # Find first nonblank line
+            nonblank_lines = [l.strip() for l in lines if l.strip()]
+            if not nonblank_lines:
+                self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note is empty")
+                return
             
-            if f"Recommendation ID: {rec_id}" not in content:
-                self.log_error(self.recs_path, row_idx, "extraction_note_id", "Evidence note missing correct Recommendation ID")
+            if nonblank_lines[0] != f"# Extraction Note: {ext_id}":
+                self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note missing correct # Extraction Note title on first line")
                 
-            required_sections = [
-                "## Recommendation", "## Source", "## Exact Location", "## Supporting Excerpt",
-                "## Faithful Paraphrase", "## Required Context", "## Source Relationship",
-                "## Comparability Assessment", "## Unknowns or Ambiguities",
-                "## Claims This Source Does Not Support", "## Verification"
-            ]
-            for sec in required_sections:
-                if sec not in content:
-                    self.log_error(self.recs_path, row_idx, "extraction_note_id", f"Evidence note missing section: {sec}")
+            heading_indices = {}
+            for i, line in enumerate(nonblank_lines):
+                if line.startswith("## "):
+                    if line in heading_indices:
+                        self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Duplicate heading: {line}")
+                    else:
+                        heading_indices[line] = i
+            
+            for sec in REQUIRED_SECTIONS:
+                if sec not in heading_indices:
+                    self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Evidence note missing section: {sec}")
+            
+            # Check order of required headings
+            found_req_headings = [h for h in nonblank_lines if h in REQUIRED_SECTIONS]
+            if found_req_headings != REQUIRED_SECTIONS:
+                self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note required headings are out of order")
+            
+            # Check Recommendation ID is within the Recommendation section
+            if "## Recommendation" in heading_indices:
+                start_idx = heading_indices["## Recommendation"]
+                end_idx = heading_indices["## Source"] if "## Source" in heading_indices else len(nonblank_lines)
+                rec_id_line = f"Recommendation ID: {rec_id}"
+                rec_id_found = False
+                for i in range(start_idx + 1, end_idx):
+                    if rec_id_line in nonblank_lines[i]:
+                        rec_id_found = True
+                        break
+                if not rec_id_found:
+                    self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note missing correct Recommendation ID within ## Recommendation section")
+
         except Exception as e:
-            self.log_error(self.recs_path, row_idx, "extraction_note_id", f"Failed to read note - {e}")
+            self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Failed to read note - {e}")
 
     def validate_post_process(self):
         if getattr(self, 'sources_rows', None):
             for i, row in enumerate(self.sources_rows, start=2):
-                ups = row['upstream_source_ids']
+                src_id = row['source_id'].strip()
+                ups = row['upstream_source_ids'].strip()
                 if ups:
                     for u in ups.split(';'):
-                        if u not in self.source_ids:
-                            self.log_error(self.sources_path, i, "upstream_source_ids", f"Foreign key {u} missing")
+                        u = u.strip()
+                        if u and u not in self.source_ids:
+                            self.log_error(self.sources_path, i, src_id, "upstream_source_ids", f"Foreign key {u} missing")
 
 def get_analysis_eligible_recommendations(recs_path):
     eligible = []
-    try:
-        with open(recs_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row.get('verification_status') == 'verified':
-                    eligible.append(row)
-    except:
-        pass
+    if not os.path.isfile(recs_path):
+        raise FileNotFoundError(f"Recommendations file not found: {recs_path}")
+        
+    with open(recs_path, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        header = next(reader, None)
+        if header != RECOMMENDATIONS_HEADER:
+            raise ValueError(f"Malformed recommendations header in {recs_path}")
+            
+        for row in reader:
+            if len(row) != len(RECOMMENDATIONS_HEADER):
+                raise ValueError(f"Malformed row in {recs_path}")
+            row_dict = dict(zip(RECOMMENDATIONS_HEADER, row))
+            if row_dict.get('verification_status', '').strip() == 'verified':
+                eligible.append(row_dict)
     return eligible
 
 def main():
