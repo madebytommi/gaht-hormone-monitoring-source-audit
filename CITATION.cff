@@ -8,4 +8,4 @@ title: "GAHT Reference Range Analysis"
 version: 1.0.0
 date-released: 2026-08-02
 url: "https://github.com/placeholder/gaht-target-ranges-analysis"
-abstract: "An open-research script and dataset that models and harmonizes target serum hormone ranges across 3 clinical protocols (Endocrine Society 2017, WPATH SOC 8 2022, UCSF 2016)."
+abstract: "An early draft scaffold for a reproducible comparison of selected GAHT monitoring guidelines. Clinical data are currently under source verification."
