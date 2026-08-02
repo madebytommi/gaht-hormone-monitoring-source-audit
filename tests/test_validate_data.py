@@ -10,14 +10,16 @@ from scripts.validate_data import Validator, SOURCES_HEADER, RECOMMENDATIONS_HEA
 
 class TestValidation(unittest.TestCase):
     def setUp(self):
-        self.tdir = tempfile.TemporaryDirectory()
-        self.sources_path = os.path.join(self.tdir.name, 'sources.csv')
-        self.recs_path = os.path.join(self.tdir.name, 'recs.csv')
-        self.ev_dir = os.path.join(self.tdir.name, 'evidence-notes')
-        os.makedirs(self.ev_dir)
+        self.tdir = os.path.join(os.path.dirname(__file__), 'tmp_data')
+        os.makedirs(self.tdir, exist_ok=True)
+        self.sources_path = os.path.join(self.tdir, 'sources.csv')
+        self.recs_path = os.path.join(self.tdir, 'recs.csv')
+        self.ev_dir = os.path.join(self.tdir, 'evidence-notes')
+        os.makedirs(self.ev_dir, exist_ok=True)
 
     def tearDown(self):
-        self.tdir.cleanup()
+        import shutil
+        shutil.rmtree(self.tdir, ignore_errors=True)
 
     def write_csv(self, path, header, rows):
         with open(path, 'w', newline='', encoding='utf-8') as f:
@@ -574,9 +576,13 @@ Recommendation ID: {rec_id}
         self.assertFalse(v.run())
 
     def test_48_existing_estradiol_total_testosterone_remains_valid(self):
-        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.sources_path, SOURCES_HEADER, [
+            self.get_valid_source_row({"source_id": "EXT0001"}),
+            self.get_valid_source_row({"source_id": "EXT0002"})
+        ])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [
             self.get_valid_rec_row({
+                "source_id": "EXT0001",
                 "recommendation_id": "REC0001",
                 "analyte": "estradiol",
                 "recommendation_type": "target_interval",
@@ -586,6 +592,7 @@ Recommendation ID: {rec_id}
                 "unit": "pg/mL"
             }),
             self.get_valid_rec_row({
+                "source_id": "EXT0002",
                 "recommendation_id": "REC0002",
                 "analyte": "total_testosterone",
                 "recommendation_type": "upper_threshold",
@@ -594,8 +601,116 @@ Recommendation ID: {rec_id}
                 "unit": "ng/dL"
             })
         ])
-        self.write_note("EXT9999", "REC0001")
-        self.write_note("EXT9999", "REC0002")
+        self.write_note("EXT0001", "REC0001")
+        self.write_note("EXT0002", "REC0002")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_49_conditional_action_threshold_missing_single_threshold(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "conditional_action_threshold",
+            "comparison_operator": "less_than",
+            "single_threshold": "",
+            "non_numeric_instruction": "action"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("requires single_threshold" in str(e) or "single-sided requires only single_threshold" in str(e) for e in v.errors))
+
+    def test_50_conditional_action_threshold_populated_bounds(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "conditional_action_threshold",
+            "comparison_operator": "less_than",
+            "single_threshold": "400",
+            "lower_bound": "100",
+            "upper_bound": "200",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "action"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("prohibits lower/upper bounds" in str(e) or "single-sided requires only single_threshold" in str(e) for e in v.errors))
+
+    def test_51_testosterone_unspecified_verified_qualified_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"verification_status": "verified", "human_verified_by": "Synth", "human_verification_date": "2026-08-01"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "Not specified",
+            "comparable_status": "comparable_with_qualification",
+            "comparison_group": "Group 1",
+            "noncomparability_reason": "Assay unknown",
+            "verification_status": "verified",
+            "human_verified_by": "Synth",
+            "human_verification_date": "2026-08-01"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_52_testosterone_unspecified_unknowns_context_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "",
+            "unknowns": "Missing assay specificity",
+            "comparable_status": "undetermined"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_53_physiologic_range_between_missing_bound(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "between",
+            "lower_bound": "320",
+            "upper_bound": "",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "typical range"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("lower and upper bound" in str(e) or "requires both lower_bound and upper_bound" in str(e) for e in v.errors))
+
+    def test_54_physiologic_range_approximately_missing_bound(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "approximately",
+            "lower_bound": "",
+            "upper_bound": "1000",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "approx range"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("both lower_bound and upper_bound" in str(e) or "approximately requires either" in str(e) for e in v.errors))
+
+    def test_55_upper_threshold_cand10_style_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "upper_threshold",
+            "comparison_operator": "less_than_or_equal",
+            "single_threshold": "200",
+            "unit": "pg/mL",
+            "required_context": "should not exceed 100-200 pg/mL"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_56_header_only_csv_remains_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertTrue(v.run(), "\\n".join(v.errors))
 

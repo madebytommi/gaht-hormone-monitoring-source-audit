@@ -236,12 +236,13 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Data type**: String
 * **Requirement**: Required
 * **Controlled values**: Already defined in `PROTOCOL.md` (`estradiol`, `total_testosterone`, `testosterone_unspecified`).
+* **Validation notes**: `testosterone_unspecified` requires exact wording in `measurement_name` and either `assay_or_lab_context` or `unknowns`. It cannot be `directly_comparable`.
 * **Blank-value behavior**: Must not be blank.
 
 ### `measurement_name`
 * **Purpose**: Specific naming convention used by the source for the measurement.
 * **Data type**: String
-* **Requirement**: Optional
+* **Requirement**: Conditionally required (Required if `analyte` is `testosterone_unspecified`).
 * **Blank-value behavior**: Leave blank if same as analyte.
 
 ### `unit`
@@ -253,7 +254,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 ### `assay_or_lab_context`
 * **Purpose**: Specific assay or laboratory instructions provided in the context.
 * **Data type**: String
-* **Requirement**: Optional
+* **Requirement**: Conditionally required (Required if `analyte` is `testosterone_unspecified` and `unknowns` is blank).
 * **Blank-value behavior**: Leave blank if not mentioned.
 
 ### `recommendation_type`
@@ -261,6 +262,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Data type**: String
 * **Requirement**: Required
 * **Controlled values**: Already defined in `PROTOCOL.md` (`target_interval`, `upper_threshold`, `lower_threshold`, `physiologic_range`, `laboratory_reference_range`, `monitoring_frequency`, `specimen_timing`, `qualitative_instruction`, `conditional_action_threshold`, `not_specified`).
+* **Validation notes**: `target_interval` requires `between`. `upper_threshold` requires `<` or `<=`. `lower_threshold` requires `>` or `>=`. `conditional_action_threshold` requires `<, <=, >, >=`. `physiologic_range` requires `within_reference_range`, `between`, or `approximately`. `laboratory_reference_range` requires `within_reference_range`.
 * **Blank-value behavior**: Must not be blank.
 
 ### `comparison_operator`
@@ -268,30 +270,34 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Data type**: String
 * **Requirement**: Required
 * **Controlled values**: Already defined in `PROTOCOL.md` (`less_than`, `less_than_or_equal`, `greater_than`, `greater_than_or_equal`, `between`, `within_reference_range`, `approximately`, `not_applicable`, `not_specified`).
+* **Validation notes**: `between` requires bounds, no single threshold. Single-sided (`<, <=, >, >=`) requires single threshold, no bounds. `approximately` requires either single threshold OR bounds. `within_reference_range`, `not_applicable`, and `not_specified` prohibit numeric fields.
 * **Blank-value behavior**: Must not be blank.
 
 ### `lower_bound`
 * **Purpose**: Lower numerical boundary of an interval.
 * **Data type**: Decimal
-* **Requirement**: Conditionally required (Required for `target_interval`, `between`).
+* **Requirement**: Conditionally required (Required for `target_interval`, `between`, and `approximately` if bounds used).
+* **Validation notes**: Prohibited for single-sided operators, `within_reference_range`, and `conditional_action_threshold`.
 * **Blank-value behavior**: Leave blank if inapplicable or not specified. Do not substitute zero.
 
 ### `upper_bound`
 * **Purpose**: Upper numerical boundary of an interval.
 * **Data type**: Decimal
-* **Requirement**: Conditionally required (Required for `target_interval`, `between`).
+* **Requirement**: Conditionally required (Required for `target_interval`, `between`, and `approximately` if bounds used).
+* **Validation notes**: Prohibited for single-sided operators, `within_reference_range`, and `conditional_action_threshold`.
 * **Blank-value behavior**: Leave blank if inapplicable or not specified. Do not substitute zero.
 
 ### `single_threshold`
 * **Purpose**: Numerical boundary for single-sided operators.
 * **Data type**: Decimal
-* **Requirement**: Conditionally required (Required for `less_than`, `greater_than_or_equal`, etc.).
+* **Requirement**: Conditionally required (Required for `<, <=, >, >=`, and `conditional_action_threshold`).
+* **Validation notes**: Prohibited for `between`, `within_reference_range`, and `physiologic_range`.
 * **Blank-value behavior**: Leave blank if inapplicable or not specified. Do not invent bounds for single thresholds.
 
 ### `non_numeric_instruction`
 * **Purpose**: Descriptive text for qualitative or non-numeric guidance.
 * **Data type**: String
-* **Requirement**: Conditionally required (Required if `recommendation_type` is qualitative).
+* **Requirement**: Conditionally required (Required if `recommendation_type` is `qualitative_instruction`, `physiologic_range`, `laboratory_reference_range`, `monitoring_frequency`, `specimen_timing`, or `conditional_action_threshold`).
 * **Blank-value behavior**: Leave blank if inapplicable.
 
 ### `route`
@@ -366,13 +372,13 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Data type**: String
 * **Requirement**: Required
 * **Controlled values**: Already defined in `PROTOCOL.md` (`directly_comparable`, `comparable_with_qualification`, `not_comparable`, `undetermined`).
-* **Validation notes**: Non-comparable recommendations must not be forced into shared interval comparisons.
+* **Validation notes**: Non-comparable recommendations must not be forced into shared interval comparisons. `testosterone_unspecified` cannot be `directly_comparable` and may only be `comparable_with_qualification` if verified and a reason is given. `physiologic_range` cannot be marked `directly_comparable` (Amendment 0.3 limitation).
 * **Blank-value behavior**: Must not be blank. Starts as `undetermined`.
 
 ### `noncomparability_reason`
 * **Purpose**: Reason if not directly comparable.
 * **Data type**: String
-* **Requirement**: Conditionally required
+* **Requirement**: Conditionally required (Required if `comparable_status` is `comparable_with_qualification` for `testosterone_unspecified`).
 * **Blank-value behavior**: Leave blank if directly comparable.
 
 ### `extracted_by`

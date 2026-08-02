@@ -442,7 +442,7 @@ Permit `physiologic_range` with:
 For every `physiologic_range`:
 * Require `non_numeric_instruction`.
 * Prohibit `single_threshold`.
-* Prohibit automatic `directly_comparable` treatment as a hard target interval.
+* Prohibit `directly_comparable` entirely (Amendment 0.3 known limitation).
 * Note: `assay_or_lab_context` is not universally required; that requirement depends on the source text.
 
 ### 16.2.3 Upper threshold peak interval context
@@ -1152,6 +1152,7 @@ Until all criteria are satisfied:
 | ------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------- |
 | 0.1     | 2026-08-02 | Draft  | Initial protocol for a reproducible source audit of selected adult GAHT monitoring guidance documents |
 | 0.2     | 2026-08-02 | Draft  | Defined machine-readable controlled vocabularies for nine previously unresolved source- and recommendation-level fields. |
+| 0.3     | 2026-08-02 | Draft  | Added testosterone_unspecified, conditional_action_threshold, numerical physiologic_range rules, and comparability restrictions. |
 
 ### Amendment 0.2
 * Amendment/version: 0.2
@@ -1161,3 +1162,12 @@ Until all criteria are satisfied:
 * Effect on existing records: None; both data files contain header rows only.
 * Prior extraction re-review required: No; no source or recommendation records yet exist.
 * Human approval: Tommi, through explicit authorization of this amendment.
+
+### Amendment 0.3
+* Amendment/version: 0.3
+* Date: 2026-08-02
+* Description: Added `testosterone_unspecified` analyte and `conditional_action_threshold` recommendation type. Implemented numerical `physiologic_range` rules and upper-edge handling for "should not exceed [interval]" instructions. Clarified that context-only passages receive no recommendation row. Enforced comparability restrictions for these new rules.
+* Reason: To honestly represent generic serum testosterone, conditional clinical actions, and physiologic ranges without inaccurately forcing them into strict target intervals.
+* Effect on existing records: none; both CSV files remain header-only.
+* Prior extraction re-review required: no; no committed recommendation records exist.
+* Human approval: Tommi, through explicit authorization of the Amendment 0.3 decision and implementation.
