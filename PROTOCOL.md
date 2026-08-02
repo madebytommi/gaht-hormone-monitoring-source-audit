@@ -483,6 +483,159 @@ Permitted values may include:
 
 The exact source wording must still be preserved in the evidence note.
 
+### 16.8 Document type
+
+Permitted values:
+
+* `clinical_practice_guideline`
+* `standards_of_care`
+* `clinical_guidance`
+* `other`
+
+Definitions:
+
+* `clinical_practice_guideline`: A formally developed clinical-practice guideline.
+* `standards_of_care`: A document formally issued as standards of care.
+* `clinical_guidance`: Institutional, organizational, or web-based clinical guidance that is not classified as one of the preceding types.
+* `other`: Another eligible document type. The precise type must be explained in `source_notes`.
+
+### 16.9 Population scope
+
+Permitted values:
+
+* `adults_only`
+* `adolescents_and_adults`
+* `lifespan_or_mixed_age`
+* `not_specified`
+
+Definitions:
+
+* `adults_only`: The source is explicitly limited to adults.
+* `adolescents_and_adults`: The source explicitly addresses both adolescents and adults.
+* `lifespan_or_mixed_age`: The source addresses a broader lifespan or mixed-age population that cannot be represented as adult-only or adolescent-and-adult guidance.
+* `not_specified`: The source does not clearly state its population scope.
+
+Population scope describes the source as a whole. It does not establish that every extracted recommendation applies to every population covered by the source.
+
+### 16.10 Geographic scope
+
+Permitted values:
+
+* `international`
+* `national`
+* `institutional`
+* `not_explicitly_stated`
+
+Definitions:
+
+* `international`: Guidance presented for an international or broadly cross-national audience.
+* `national`: Guidance presented primarily for one country. Record the country in `source_notes`.
+* `institutional`: Guidance issued for or by a specific institution or health system.
+* `not_explicitly_stated`: The source does not clearly define geographic applicability.
+
+Do not infer geographic applicability merely from the organization’s physical location.
+
+### 16.11 Source status
+
+Permitted values:
+
+* `current_as_of_access_date`
+* `superseded`
+* `withdrawn`
+* `archived`
+* `unclear`
+
+Definitions:
+
+* `current_as_of_access_date`: The source appeared current according to the authoritative location on the recorded access date.
+* `superseded`: A newer version has formally replaced the source.
+* `withdrawn`: The issuing organization or publisher has withdrawn the source.
+* `archived`: The source remains accessible principally as archived or historical material.
+* `unclear`: Current status could not be established.
+
+`current_as_of_access_date` must not be interpreted as a permanent status.
+
+### 16.12 Correction status
+
+Permitted values:
+
+* `not_checked`
+* `none_found_as_of_access_date`
+* `correction_found_incorporated`
+* `correction_found_not_incorporated`
+* `unclear`
+
+Definitions:
+
+* `not_checked`: No correction or corrigendum search has yet been completed.
+* `none_found_as_of_access_date`: A correction search was completed, but none was found by the recorded access date.
+* `correction_found_incorporated`: A relevant correction was found and incorporated into the extraction.
+* `correction_found_not_incorporated`: A relevant correction was found but has not yet been incorporated.
+* `unclear`: Correction status could not be resolved.
+
+`none_found_as_of_access_date` does not prove that no correction exists.
+
+### 16.13 Age group
+
+Permitted values:
+
+* `adult`
+* `adolescent_and_adult`
+* `mixed_age`
+* `not_specified`
+
+Definitions:
+
+* `adult`: The recommendation is explicitly adult-specific.
+* `adolescent_and_adult`: The recommendation explicitly applies to both adolescents and adults.
+* `mixed_age`: The recommendation applies to a broader or mixed-age population that cannot be separated.
+* `not_specified`: The recommendation passage does not clearly state an age group.
+
+Do not convert mixed-population recommendations into adult-only recommendations.
+
+### 16.14 Therapy direction
+
+Permitted values:
+
+* `feminizing`
+* `masculinizing`
+* `general_gaht`
+* `not_specified`
+
+Definitions:
+
+* `feminizing`: The recommendation concerns feminizing hormone therapy.
+* `masculinizing`: The recommendation concerns masculinizing hormone therapy.
+* `general_gaht`: The recommendation explicitly applies across GAHT directions or is a general monitoring instruction.
+* `not_specified`: Therapy direction cannot be established from the source passage.
+
+### 16.15 Analyte
+
+Permitted values:
+
+* `estradiol`
+* `total_testosterone`
+
+Each recommendation record must concern exactly one analyte.
+
+When one passage contains separate instructions for both analytes, create separate recommendation records. Do not use a combined analyte value.
+
+### 16.16 Another review needed
+
+Permitted values:
+
+* `yes`
+* `no`
+
+This field is required for every recommendation record.
+
+Definitions:
+
+* `yes`: A further human review or dispute-resolution step is required.
+* `no`: No further review is currently required.
+
+Do not leave this field blank.
+
 ---
 
 ## 17. Evidence Notes
@@ -956,3 +1109,13 @@ Until all criteria are satisfied:
 | Version | Date       | Status | Description                                                                                           |
 | ------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------- |
 | 0.1     | 2026-08-02 | Draft  | Initial protocol for a reproducible source audit of selected adult GAHT monitoring guidance documents |
+| 0.2     | 2026-08-02 | Draft  | Defined machine-readable controlled vocabularies for nine previously unresolved source- and recommendation-level fields. |
+
+### Amendment 0.2
+* Amendment/version: 0.2
+* Date: 2026-08-02
+* Description: Defined machine-readable controlled vocabularies for nine previously unresolved source- and recommendation-level fields.
+* Reason: Required for deterministic validation before source extraction.
+* Effect on existing records: None; both data files contain header rows only.
+* Prior extraction re-review required: No; no source or recommendation records yet exist.
+* Human approval: Tommi, through explicit authorization of this amendment.

@@ -14,19 +14,6 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 - **Analysis Rules**: Only `verified` records may enter analysis or visualization. Non-comparable recommendations must not be forced into shared interval comparisons.
 - **Controlled Vocabularies**: Do not invent new controlled-vocabulary values that conflict with `PROTOCOL.md`. If a necessary value is undefined, the field must be documented as pending a protocol amendment.
 
-## Pending Controlled-Vocabulary Decisions
-
-The following fields will require a protocol amendment before their exact controlled vocabularies can be automated and enforced:
-- `document_type`
-- `population_scope`
-- `geographic_scope`
-- `source_status`
-- `correction_status`
-- `age_group`
-- `therapy_direction`
-- `analyte`
-- `another_review_needed`
-
 ---
 
 ## File: `data/sources.csv`
@@ -54,7 +41,7 @@ The following fields will require a protocol amendment before their exact contro
 * **Purpose**: The type of document (e.g., guideline, standard of care).
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; pending a protocol amendment.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`clinical_practice_guideline`, `standards_of_care`, `clinical_guidance`, `other`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `version`
@@ -92,28 +79,28 @@ The following fields will require a protocol amendment before their exact contro
 * **Purpose**: The intended population for the source.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; pending a protocol amendment.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`adults_only`, `adolescents_and_adults`, `lifespan_or_mixed_age`, `not_specified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `geographic_scope`
 * **Purpose**: The geographic applicability of the document.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; pending a protocol amendment.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`international`, `national`, `institutional`, `not_explicitly_stated`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `source_status`
 * **Purpose**: Status of the document (e.g., current, superseded).
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; pending a protocol amendment.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`current_as_of_access_date`, `superseded`, `withdrawn`, `archived`, `unclear`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `correction_status`
 * **Purpose**: Whether corrections, updates, or corrigenda have been issued and incorporated.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; pending a protocol amendment.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`not_checked`, `none_found_as_of_access_date`, `correction_found_incorporated`, `correction_found_not_incorporated`, `unclear`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `upstream_source_ids`
@@ -221,14 +208,14 @@ The following fields will require a protocol amendment before their exact contro
 * **Purpose**: Specified age group (e.g., adult).
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; pending a protocol amendment.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`adult`, `adolescent_and_adult`, `mixed_age`, `not_specified`).
 * **Blank-value behavior**: Use `not_specified` if missing.
 
 ### `therapy_direction`
 * **Purpose**: Direction of hormone therapy.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; exact controlled vocabulary is pending a protocol amendment. No value should be enforced until that amendment is approved.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`feminizing`, `masculinizing`, `general_gaht`, `not_specified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `population_qualifiers`
@@ -248,7 +235,7 @@ The following fields will require a protocol amendment before their exact contro
 * **Purpose**: The hormone being measured.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Not yet defined; exact stored values are pending a protocol amendment. The project scope is currently limited to serum estradiol and serum total testosterone.
+* **Controlled values**: Already defined in `PROTOCOL.md` (`estradiol`, `total_testosterone`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `measurement_name`
@@ -424,6 +411,6 @@ The following fields will require a protocol amendment before their exact contro
 ### `another_review_needed`
 * **Purpose**: Flag indicating if further review or dispute resolution is required.
 * **Data type**: String
-* **Requirement**: Optional
-* **Controlled values**: Not yet defined; pending a protocol amendment.
-* **Blank-value behavior**: Leave blank if no additional review is needed.
+* **Requirement**: Required
+* **Controlled values**: Already defined in `PROTOCOL.md` (`yes`, `no`).
+* **Blank-value behavior**: Must not be blank.
