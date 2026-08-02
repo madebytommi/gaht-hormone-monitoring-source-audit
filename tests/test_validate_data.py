@@ -385,5 +385,219 @@ Recommendation ID: {rec_id}
         with self.assertRaises(ValueError):
             get_analysis_eligible_recommendations(self.recs_path)
 
+    def test_35_testosterone_unspecified_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "Not specified in text",
+            "comparable_status": "undetermined"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_36_testosterone_unspecified_missing_measurement_name(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "",
+            "assay_or_lab_context": "Not specified in text"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("measurement_name" in str(e) for e in v.errors))
+
+    def test_37_testosterone_unspecified_missing_specificity_context(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "",
+            "unknowns": ""
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_38_testosterone_unspecified_directly_comparable_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "Not specified in text",
+            "comparable_status": "directly_comparable",
+            "comparison_group": "Group 1"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_39_testosterone_unspecified_qualified_without_verification_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "Not specified",
+            "comparable_status": "comparable_with_qualification",
+            "comparison_group": "Group 1",
+            "noncomparability_reason": "Assay unknown",
+            "verification_status": "pending"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_40_testosterone_unspecified_qualified_without_reason_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"verification_status": "verified", "human_verified_by": "Synth", "human_verification_date": "2026-08-01"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "analyte": "testosterone_unspecified",
+            "measurement_name": "serum testosterone",
+            "assay_or_lab_context": "Not specified",
+            "comparable_status": "comparable_with_qualification",
+            "comparison_group": "Group 1",
+            "noncomparability_reason": "",
+            "verification_status": "verified",
+            "human_verified_by": "Synth",
+            "human_verification_date": "2026-08-01"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_41_conditional_action_threshold_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "conditional_action_threshold",
+            "comparison_operator": "less_than",
+            "single_threshold": "400",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "adjust dose"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_42_conditional_action_threshold_invalid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        # Invalid operator
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "conditional_action_threshold",
+            "comparison_operator": "between",
+            "lower_bound": "100",
+            "upper_bound": "200",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "adjust dose"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+        # Missing instruction
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "conditional_action_threshold",
+            "comparison_operator": "less_than",
+            "single_threshold": "400",
+            "unit": "ng/dL",
+            "non_numeric_instruction": ""
+        })])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_43_physiologic_range_between_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "between",
+            "lower_bound": "320",
+            "upper_bound": "1000",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "typical male range"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_44_physiologic_range_approximately_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "approximately",
+            "lower_bound": "320",
+            "upper_bound": "1000",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "approx male range"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_45_physiologic_range_within_reference_range_nonnumeric_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "within_reference_range",
+            "non_numeric_instruction": "normal male range"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
+    def test_46_physiologic_range_with_single_threshold_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "approximately",
+            "single_threshold": "500",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "approx normal"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_47_physiologic_range_directly_comparable_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
+            "recommendation_type": "physiologic_range",
+            "comparison_operator": "between",
+            "lower_bound": "320",
+            "upper_bound": "1000",
+            "unit": "ng/dL",
+            "non_numeric_instruction": "typical range",
+            "comparable_status": "directly_comparable",
+            "comparison_group": "Group 1"
+        })])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_48_existing_estradiol_total_testosterone_remains_valid(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [
+            self.get_valid_rec_row({
+                "recommendation_id": "REC0001",
+                "analyte": "estradiol",
+                "recommendation_type": "target_interval",
+                "comparison_operator": "between",
+                "lower_bound": "100",
+                "upper_bound": "200",
+                "unit": "pg/mL"
+            }),
+            self.get_valid_rec_row({
+                "recommendation_id": "REC0002",
+                "analyte": "total_testosterone",
+                "recommendation_type": "upper_threshold",
+                "comparison_operator": "less_than",
+                "single_threshold": "50",
+                "unit": "ng/dL"
+            })
+        ])
+        self.write_note("EXT9999", "REC0001")
+        self.write_note("EXT9999", "REC0002")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run(), "\\n".join(v.errors))
+
 if __name__ == '__main__':
     unittest.main()

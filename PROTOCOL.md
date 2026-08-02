@@ -154,6 +154,7 @@ The initial analysis is limited to:
 
 * Serum estradiol
 * Serum total testosterone
+* Serum testosterone_unspecified (when the source does not specify total, free, or another fraction)
 
 Free testosterone, sex hormone-binding globulin, estrone, gonadotropins, prolactin, hematocrit, liver markers, lipids, and other laboratory measures are outside the initial scope unless needed to explain the context of an included estradiol or testosterone recommendation.
 
@@ -180,6 +181,7 @@ The project may include:
 * Monitoring-frequency recommendations
 * Specimen-timing instructions
 * Qualitative monitoring recommendations
+* Conditional action thresholds
 
 A recommendation does not need to contain a numerical value to be eligible.
 
@@ -420,7 +422,36 @@ Permitted values:
 * `monitoring_frequency`
 * `specimen_timing`
 * `qualitative_instruction`
+* `conditional_action_threshold`
 * `not_specified`
+
+### 16.2.1 Conditional action threshold rules
+* Allow only `less_than`, `less_than_or_equal`, `greater_than`, or `greater_than_or_equal`.
+* Require `single_threshold`.
+* Prohibit `lower_bound` and `upper_bound`.
+* Require `non_numeric_instruction`.
+* Preserve surrounding limitations in `required_context`.
+* Distinguish it from therapeutic upper and lower thresholds (which define the physiological boundary of a target state, whereas conditional action thresholds define mathematical triggers that mandate specific clinical action).
+
+### 16.2.2 Numerical physiologic range rules
+Permit `physiologic_range` with:
+* `within_reference_range` and no numeric fields;
+* `between` with `lower_bound` and `upper_bound`;
+* `approximately` with `lower_bound` and `upper_bound`.
+
+For every `physiologic_range`:
+* Require `non_numeric_instruction`.
+* Prohibit `single_threshold`.
+* Prohibit automatic `directly_comparable` treatment as a hard target interval.
+* Note: `assay_or_lab_context` is not universally required; that requirement depends on the source text.
+
+### 16.2.3 Upper threshold peak interval context
+A "should not exceed" instruction referencing an interval may be represented as:
+* `upper_threshold`
+* `less_than_or_equal`
+* the upper edge in `single_threshold`
+
+The complete interval and physiologic-range context must remain in the excerpt and contextual fields. The lower edge must not be converted into a required target floor.
 
 ### 16.3 Comparison operator
 
@@ -615,6 +646,16 @@ Permitted values:
 
 * `estradiol`
 * `total_testosterone`
+* `testosterone_unspecified`
+
+Definition for `testosterone_unspecified`: Serum testosterone for which the source does not specify total, free, or another fraction.
+Rules:
+* Preserve exact source wording in `measurement_name`.
+* Require at least one of `assay_or_lab_context` or `unknowns` to document the missing specificity.
+* Default comparability to `undetermined`.
+* Prohibit `directly_comparable`.
+* Permit `comparable_with_qualification` only when the record is verified and `noncomparability_reason` explains the qualification.
+* Never automatically group it with `total_testosterone`.
 
 Each recommendation record must concern exactly one analyte.
 
@@ -739,10 +780,11 @@ Each source must proceed through the following sequence:
 8. Mark missing information as `not_specified` rather than guessing.
 9. Record whether the recommendation appears original or dependent on another document.
 10. Assess comparability only after the contextual extraction is complete.
-11. Leave the record as `pending`.
-12. Conduct human verification against the source.
-13. Correct any discrepancy.
-14. Mark the record `verified` only after explicit human approval.
+11. Note that `context_only` is an audit disposition, not a CSV controlled value. General references to hormones or sex steroids receive no recommendation row unless an in-scope analyte is explicitly identified.
+12. Leave the record as `pending`.
+13. Conduct human verification against the source.
+14. Correct any discrepancy.
+15. Mark the record `verified` only after explicit human approval.
 
 Sources should be completed one at a time.
 

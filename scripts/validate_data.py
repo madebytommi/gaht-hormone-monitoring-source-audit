@@ -41,8 +41,8 @@ REC_VOCABS = {
     "age_group": {"adult", "adolescent_and_adult", "mixed_age", "not_specified"},
     "therapy_direction": {"feminizing", "masculinizing", "general_gaht", "not_specified"},
     "treatment_phase": {"initiation", "dose_adjustment", "stable_maintenance", "general", "not_specified"},
-    "analyte": {"estradiol", "total_testosterone"},
-    "recommendation_type": {"target_interval", "upper_threshold", "lower_threshold", "physiologic_range", "laboratory_reference_range", "monitoring_frequency", "specimen_timing", "qualitative_instruction", "not_specified"},
+    "analyte": {"estradiol", "total_testosterone", "testosterone_unspecified"},
+    "recommendation_type": {"target_interval", "upper_threshold", "lower_threshold", "physiologic_range", "laboratory_reference_range", "monitoring_frequency", "specimen_timing", "qualitative_instruction", "conditional_action_threshold", "not_specified"},
     "comparison_operator": {"less_than", "less_than_or_equal", "greater_than", "greater_than_or_equal", "between", "within_reference_range", "approximately", "not_applicable", "not_specified"},
     "specimen_timing": {"peak", "trough", "mid_cycle", "before_next_dose", "after_application", "any_time", "route_specific", "not_specified"},
     "comparable_status": {"directly_comparable", "comparable_with_qualification", "not_comparable", "undetermined"},
@@ -306,18 +306,55 @@ class Validator:
         if rt == 'lower_threshold' and op not in ('greater_than', 'greater_than_or_equal'):
             self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", "lower_threshold requires greater_than or greater_than_or_equal")
 
-        qual_types = {'physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction', 'not_specified'}
+        qual_types = {'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction', 'not_specified'}
         if rt in qual_types:
             if lb or ub or st:
                 self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", f"numeric fields must be blank for {rt}")
 
-        if rt in ('physiologic_range', 'laboratory_reference_range') and op != 'within_reference_range':
+        if rt == 'laboratory_reference_range' and op != 'within_reference_range':
             self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", f"{rt} requires within_reference_range")
 
-        req_non_numeric = {'physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction'}
+        req_non_numeric = {'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction'}
         if rt in req_non_numeric:
             if not row['non_numeric_instruction'].strip():
                 self.log_error(self.recs_path, row_idx, rec_id, "non_numeric_instruction", f"Required for {rt}")
+
+        # Analyte specific rules
+        if row['analyte'].strip() == 'testosterone_unspecified':
+            if not row['measurement_name'].strip():
+                self.log_error(self.recs_path, row_idx, rec_id, "measurement_name", "Required to preserve exact source wording for testosterone_unspecified")
+            if not row['assay_or_lab_context'].strip() and not row['unknowns'].strip():
+                self.log_error(self.recs_path, row_idx, rec_id, "testosterone_unspecified", "Requires either assay_or_lab_context or unknowns to document missing specificity")
+            if row['comparable_status'].strip() == 'directly_comparable':
+                self.log_error(self.recs_path, row_idx, rec_id, "comparable_status", "testosterone_unspecified cannot be directly_comparable")
+            if row['comparable_status'].strip() == 'comparable_with_qualification':
+                if row['verification_status'].strip() != 'verified':
+                    self.log_error(self.recs_path, row_idx, rec_id, "comparable_status", "testosterone_unspecified can only be comparable_with_qualification when verified")
+                if not row['noncomparability_reason'].strip():
+                    self.log_error(self.recs_path, row_idx, rec_id, "noncomparability_reason", "Required to explain qualification for testosterone_unspecified")
+
+        # Recommendation type specific rules
+        if rt == 'conditional_action_threshold':
+            if op not in ('less_than', 'less_than_or_equal', 'greater_than', 'greater_than_or_equal'):
+                self.log_error(self.recs_path, row_idx, rec_id, "comparison_operator", "conditional_action_threshold requires single-sided operator")
+            if not st or lb or ub:
+                self.log_error(self.recs_path, row_idx, rec_id, "conditional_action_threshold", "requires single_threshold and prohibits lower/upper bounds")
+            if not row['non_numeric_instruction'].strip():
+                self.log_error(self.recs_path, row_idx, rec_id, "non_numeric_instruction", "Required for conditional_action_threshold")
+
+        if rt == 'physiologic_range':
+            if op not in ('within_reference_range', 'between', 'approximately'):
+                self.log_error(self.recs_path, row_idx, rec_id, "comparison_operator", "physiologic_range requires within_reference_range, between, or approximately")
+            if op == 'within_reference_range' and (lb or ub or st):
+                self.log_error(self.recs_path, row_idx, rec_id, "physiologic_range", "within_reference_range must have no numeric fields")
+            if op in ('between', 'approximately') and (not lb or not ub):
+                self.log_error(self.recs_path, row_idx, rec_id, "physiologic_range", "between or approximately requires both lower_bound and upper_bound")
+            if st:
+                self.log_error(self.recs_path, row_idx, rec_id, "single_threshold", "Prohibited for physiologic_range")
+            if row['comparable_status'].strip() == 'directly_comparable':
+                self.log_error(self.recs_path, row_idx, rec_id, "comparable_status", "physiologic_range cannot be directly_comparable as a hard target interval")
+            if not row['non_numeric_instruction'].strip():
+                self.log_error(self.recs_path, row_idx, rec_id, "non_numeric_instruction", "Required for physiologic_range")
 
         # Verification rules
         vstatus = row['verification_status'].strip()

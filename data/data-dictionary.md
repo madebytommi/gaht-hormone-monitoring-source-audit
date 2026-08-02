@@ -235,7 +235,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: The hormone being measured.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Already defined in `PROTOCOL.md` (`estradiol`, `total_testosterone`).
+* **Controlled values**: Already defined in `PROTOCOL.md` (`estradiol`, `total_testosterone`, `testosterone_unspecified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `measurement_name`
@@ -260,7 +260,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Categorization of the instruction.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Already defined in `PROTOCOL.md` (`target_interval`, `upper_threshold`, `lower_threshold`, `physiologic_range`, `laboratory_reference_range`, `monitoring_frequency`, `specimen_timing`, `qualitative_instruction`, `not_specified`).
+* **Controlled values**: Already defined in `PROTOCOL.md` (`target_interval`, `upper_threshold`, `lower_threshold`, `physiologic_range`, `laboratory_reference_range`, `monitoring_frequency`, `specimen_timing`, `qualitative_instruction`, `conditional_action_threshold`, `not_specified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `comparison_operator`
