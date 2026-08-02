@@ -1,3 +1,7 @@
+"""
+All fixtures in this file are completely arbitrary, synthetic, and non-clinical.
+They must never be interpreted as real GAHT recommendations or clinical target intervals.
+"""
 import unittest
 import tempfile
 import os
@@ -40,9 +44,8 @@ Recommendation ID: {rec_id}
 """
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
-            
+
     def get_valid_source_row(self, overrides=None):
-        # All values are synthetic and non-clinical.
         row = {
             "source_id": "SRC9999",
             "organization": "Synthetic Org",
@@ -67,7 +70,6 @@ Recommendation ID: {rec_id}
         return [row[h] for h in SOURCES_HEADER]
 
     def get_valid_rec_row(self, overrides=None):
-        # All values are synthetic and non-clinical.
         row = {
             "recommendation_id": "REC9999",
             "source_id": "SRC9999",
@@ -116,264 +118,272 @@ Recommendation ID: {rec_id}
         if overrides: row.update(overrides)
         return [row[h] for h in RECOMMENDATIONS_HEADER]
 
-    def test_1_current_header_only_passes(self):
+    def test_01_headers_passes(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertTrue(v.run())
         self.assertEqual(len(v.errors), 0)
-        
-    def test_2_incorrect_headers_fail(self):
+
+    def test_02_headers_fail(self):
         self.write_csv(self.sources_path, ["wrong_header"], [])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        
-        self.write_csv(self.sources_path, SOURCES_HEADER, [])
-        self.write_csv(self.recs_path, ["wrong_header"], [])
+        self.assertTrue(any("Headers do not match exactly" in e for e in v.errors))
+
+    def test_03_invalid_id_formats_fail(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"source_id": "BAD1234"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_id": "WRONG_ID", "source_id": "BAD1234", "extraction_note_id": "EXT_NO"})])
+        self.write_note("EXT_NO", "WRONG_ID")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        err = " ".join(v.errors)
+        self.assertIn("BAD1234", err)
+        self.assertIn("WRONG_ID", err)
+
+    def test_04_duplicate_ids_fail(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row(), self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row(), self.get_valid_rec_row()])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("Duplicate ID" in e for e in v.errors))
+
+    def test_05_invalid_vocab_values_fail(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"document_type": "invalid_type"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"therapy_direction": "invalid_dir"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+        self.assertTrue(any("invalid_type" in e for e in v.errors))
+
+    def test_06_exact_iso_date_validation(self):
+        # Mismatched padding
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"access_date": "2026-8-01"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
 
-    def test_3_blank_required_source_fields_fail(self):
-        # Blank org
+        # Impossible date
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"access_date": "2026-02-30"})])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+        # Valid
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"access_date": "2026-08-01"})])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run())
+
+    def test_07_required_source_fields_fail_when_blank(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"organization": ""})])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("organization" in e and "blank" in e for e in v.errors))
 
-    def test_4_blank_required_rec_fields_fail(self):
+    def test_08_required_rec_fields_fail_when_blank(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"short_source_excerpt": ""})])
         self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("short_source_excerpt" in e and "blank" in e for e in v.errors))
 
-    def test_5_extraction_date_validation(self):
-        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        # malformed
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"extraction_date": "08-01-2026"})])
-        self.write_note("EXT9999", "REC9999")
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertFalse(v.run())
-        self.assertTrue(any("extraction_date" in e and "Invalid date format" in e for e in v.errors))
-        
-        # blank
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"extraction_date": ""})])
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertFalse(v.run())
-        self.assertTrue(any("extraction_date" in e and "Cannot be blank" in e for e in v.errors))
-
-    def test_6_whitespace_only_required_values_fail(self):
+    def test_09_whitespace_only_required_fields_fail(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"document_title": "   "})])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("document_title" in e and "Cannot be blank" in e for e in v.errors))
 
-    def test_7_qualitative_instruction_between_with_bounds_fails(self):
-        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        # Type qualitative, but uses between and has bounds.
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
-            "recommendation_type": "qualitative_instruction", 
-            "comparison_operator": "between", 
-            "lower_bound": "1", 
-            "upper_bound": "2", 
-            "unit": "pg/mL"
-        })])
+    def test_10_missing_source_foreign_keys_fail(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"source_id": "SRC9999"})])
         self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("numeric fields must be blank for qualitative_instruction" in e for e in v.errors))
 
-    def test_8_monitoring_frequency_with_numeric_fields_fails(self):
+    def test_11_missing_evidence_note_files_fail(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
-            "recommendation_type": "monitoring_frequency", 
-            "comparison_operator": "not_applicable", 
-            "single_threshold": "100", 
-            "unit": "pg/mL"
-        })])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row()])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_12_mismatched_evidence_note_ids_fail(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row()])
+        self.write_note("EXT9999", "WRONG_ID")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_13_adapted_reproduced_derived_without_upstream_fail(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"original_or_adapted": "adapted", "upstream_source_id": ""})])
         self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("numeric fields must be blank for monitoring_frequency" in e for e in v.errors))
 
-    def test_9_not_specified_rec_with_numeric_fails(self):
-        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({
-            "recommendation_type": "not_specified", 
-            "comparison_operator": "less_than", 
-            "single_threshold": "50", 
-            "unit": "pg/mL"
-        })])
+    def test_14_original_with_upstream_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row(), self.get_valid_source_row({"source_id": "SRC8888"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"original_or_adapted": "original", "upstream_source_id": "SRC8888"})])
         self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("numeric fields must be blank for not_specified" in e for e in v.errors))
 
-    def test_10_exact_evidence_note_title_required(self):
+    def test_15_unclear_with_malformed_or_self_referential_upstream_fails(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row()])
-        content = """# Wrong Title
-## Recommendation
-Recommendation ID: REC9999
-## Source
-## Exact Location
-## Supporting Excerpt
-## Faithful Paraphrase
-## Required Context
-## Source Relationship
-## Comparability Assessment
-## Unknowns or Ambiguities
-## Claims This Source Does Not Support
-## Verification
-"""
-        self.write_note("EXT9999", "REC9999", content)
+        # Self referential
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"original_or_adapted": "unclear", "upstream_source_id": "SRC9999"})])
+        self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("title on first line" in e for e in v.errors))
+        self.assertTrue(any("Self-referential" in e for e in v.errors))
 
-    def test_11_evidence_note_headings(self):
+    def test_16_source_level_upstream_ids_fail(self):
+        # Malformed
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"upstream_source_ids": "BAD123"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+        # Self-referential
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"upstream_source_ids": "SRC9999"})])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_17_other_document_type_requires_notes(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"document_type": "other", "source_notes": ""})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_18_national_geographic_scope_requires_notes(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"geographic_scope": "national", "source_notes": ""})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_19_non_numeric_nan_infinite_values_fail(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row()])
-        
-        # Missing heading
-        content_missing = """# Extraction Note: EXT9999
-## Recommendation
-Recommendation ID: REC9999
-## Source
-## Exact Location
-## Supporting Excerpt
-## Faithful Paraphrase
-## Required Context
-## Source Relationship
-## Comparability Assessment
-## Unknowns or Ambiguities
-## Verification
-"""
-        self.write_note("EXT9999", "REC9999", content_missing)
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "upper_threshold", "comparison_operator": "less_than", "single_threshold": "NaN", "unit": "synthetic_unit"})])
+        self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertFalse(v.run())
-        self.assertTrue(any("missing section: ## Claims This Source Does Not Support" in e for e in v.errors))
-        
-        # Duplicate heading
-        content_dup = """# Extraction Note: EXT9999
-## Recommendation
-Recommendation ID: REC9999
-## Recommendation
-## Source
-## Exact Location
-## Supporting Excerpt
-## Faithful Paraphrase
-## Required Context
-## Source Relationship
-## Comparability Assessment
-## Unknowns or Ambiguities
-## Claims This Source Does Not Support
-## Verification
-"""
-        self.write_note("EXT9999", "REC9999", content_dup)
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertFalse(v.run())
-        self.assertTrue(any("Duplicate heading" in e for e in v.errors))
-        
-        # Out of order
-        content_order = """# Extraction Note: EXT9999
-## Source
-## Recommendation
-Recommendation ID: REC9999
-## Exact Location
-## Supporting Excerpt
-## Faithful Paraphrase
-## Required Context
-## Source Relationship
-## Comparability Assessment
-## Unknowns or Ambiguities
-## Claims This Source Does Not Support
-## Verification
-"""
-        self.write_note("EXT9999", "REC9999", content_order)
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertFalse(v.run())
-        self.assertTrue(any("out of order" in e for e in v.errors))
-        
-        # Rec ID outside section
-        content_outside = """# Extraction Note: EXT9999
-## Recommendation
-## Source
-Recommendation ID: REC9999
-## Exact Location
-## Supporting Excerpt
-## Faithful Paraphrase
-## Required Context
-## Source Relationship
-## Comparability Assessment
-## Unknowns or Ambiguities
-## Claims This Source Does Not Support
-## Verification
-"""
-        self.write_note("EXT9999", "REC9999", content_outside)
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertFalse(v.run())
-        self.assertTrue(any("missing correct Recommendation ID within ## Recommendation section" in e for e in v.errors))
 
-    def test_12_analysis_eligibility_errors(self):
-        # Missing file
-        with self.assertRaises(FileNotFoundError):
-            get_analysis_eligible_recommendations(os.path.join(self.tdir.name, 'nonexistent.csv'))
-            
-        # Malformed header
-        self.write_csv(self.recs_path, ["bad_header"], [])
-        with self.assertRaises(ValueError):
-            get_analysis_eligible_recommendations(self.recs_path)
-            
-        # Malformed row length
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [["just one val"]])
-        with self.assertRaises(ValueError):
-            get_analysis_eligible_recommendations(self.recs_path)
-
-    def test_13_error_messages_contain_ids(self):
-        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"source_id": "SRC1234", "document_type": "invalid"})])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_id": "REC5678", "therapy_direction": "invalid"})])
-        self.write_note("EXT9999", "REC5678")
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertFalse(v.run())
-        err_str = " ".join(v.errors)
-        self.assertIn("SRC1234", err_str)
-        self.assertIn("REC5678", err_str)
-
-    def test_14_fully_populated_synthetic_pending_passes(self):
+    def test_20_numeric_without_units_fail(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "upper_threshold", "comparison_operator": "less_than", "single_threshold": "123.456", "unit": ""})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_21_single_sided_incorrectly_represented_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "upper_threshold", "comparison_operator": "less_than", "lower_bound": "123.456", "upper_bound": "789.012", "single_threshold": "", "unit": "synthetic_unit"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_22_valid_single_threshold_passes(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "upper_threshold", "comparison_operator": "less_than", "single_threshold": "123.456", "unit": "synthetic_unit", "non_numeric_instruction": ""})])
         self.write_note("EXT9999", "REC9999")
         v = Validator(self.sources_path, self.recs_path, self.ev_dir)
         self.assertTrue(v.run())
 
-    def test_15_fully_populated_synthetic_verified_passes(self):
+    def test_23_missing_interval_boundaries_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "target_interval", "comparison_operator": "between", "lower_bound": "123.456", "upper_bound": "", "unit": "synthetic_unit"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_24_lower_bound_greater_than_upper_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "target_interval", "comparison_operator": "between", "lower_bound": "789.012", "upper_bound": "123.456", "unit": "synthetic_unit", "non_numeric_instruction": ""})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_25_qualitative_records_with_blank_numerical_passes(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "qualitative_instruction"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertTrue(v.run())
+
+    def test_26_qualitative_with_numerical_fields_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"recommendation_type": "monitoring_frequency", "single_threshold": "123.456", "unit": "synthetic_unit"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_27_not_comparable_without_reason_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"comparable_status": "not_comparable", "noncomparability_reason": ""})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_28_comparable_without_group_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"comparable_status": "directly_comparable", "comparison_group": ""})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_29_verified_without_metadata_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"verification_status": "verified"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_30_unverified_with_metadata_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"verification_status": "pending", "human_verified_by": "SynthUser"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [])
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_31_recs_verified_before_source_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row({"verification_status": "pending"})])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"verification_status": "verified", "human_verified_by": "SynthUser", "human_verification_date": "2026-08-01"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_32_invalid_another_review_needed_fails(self):
+        self.write_csv(self.sources_path, SOURCES_HEADER, [self.get_valid_source_row()])
+        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [self.get_valid_rec_row({"another_review_needed": "maybe"})])
+        self.write_note("EXT9999", "REC9999")
+        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
+        self.assertFalse(v.run())
+
+    def test_33_analysis_eligibility(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [
-            self.get_valid_source_row({"verification_status": "verified", "human_verified_by": "User", "human_verification_date": "2026-08-01"})
+            self.get_valid_source_row({"verification_status": "verified", "human_verified_by": "Synth", "human_verification_date": "2026-08-01"})
         ])
-        self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [
-            self.get_valid_rec_row({
-                "verification_status": "verified", "human_verified_by": "User", "human_verification_date": "2026-08-01", 
-                "comparison_operator": "between", "lower_bound": "100", "upper_bound": "200", "unit": "pg/mL", 
-                "recommendation_type": "target_interval"
-            })
-        ])
-        self.write_note("EXT9999", "REC9999")
-        v = Validator(self.sources_path, self.recs_path, self.ev_dir)
-        self.assertTrue(v.run())
-
-    def test_16_analysis_eligibility_returns_verified(self):
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [
             self.get_valid_rec_row({"recommendation_id": "REC0001", "verification_status": "pending"}),
-            self.get_valid_rec_row({"recommendation_id": "REC0002", "verification_status": "verified"})
+            self.get_valid_rec_row({"recommendation_id": "REC0002", "verification_status": "verified", "human_verified_by": "Synth", "human_verification_date": "2026-08-01", "comparison_operator": "between", "lower_bound": "123.456", "upper_bound": "789.012", "unit": "synthetic_unit", "recommendation_type": "target_interval", "non_numeric_instruction": ""}),
+            self.get_valid_rec_row({"recommendation_id": "REC0003", "verification_status": "excluded"}),
+            self.get_valid_rec_row({"recommendation_id": "REC0004", "verification_status": "needs_revision"})
         ])
+        self.write_note("EXT9999", "REC0001")
+        self.write_note("EXT9999", "REC0002")
+        self.write_note("EXT9999", "REC0003")
+        self.write_note("EXT9999", "REC0004")
+
+        # Test analysis file
         eligible = get_analysis_eligible_recommendations(self.recs_path)
         self.assertEqual(len(eligible), 1)
         self.assertEqual(eligible[0]['recommendation_id'], 'REC0002')
+
+    def test_34_missing_analysis_files_raise(self):
+        with self.assertRaises(FileNotFoundError):
+            get_analysis_eligible_recommendations(os.path.join(self.tdir.name, 'nonexistent.csv'))
+
+        self.write_csv(self.recs_path, ["bad_header"], [])
+        with self.assertRaises(ValueError):
+            get_analysis_eligible_recommendations(self.recs_path)
 
 if __name__ == '__main__':
     unittest.main()

@@ -7,23 +7,23 @@ from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
 SOURCES_HEADER = [
-    "source_id", "organization", "document_title", "document_type", "version", 
-    "publication_year", "doi", "official_url", "access_date", "population_scope", 
-    "geographic_scope", "source_status", "correction_status", "upstream_source_ids", 
+    "source_id", "organization", "document_title", "document_type", "version",
+    "publication_year", "doi", "official_url", "access_date", "population_scope",
+    "geographic_scope", "source_status", "correction_status", "upstream_source_ids",
     "source_notes", "verification_status", "human_verified_by", "human_verification_date"
 ]
 
 RECOMMENDATIONS_HEADER = [
-    "recommendation_id", "source_id", "extraction_note_id", "original_or_adapted", 
-    "upstream_source_id", "section", "subsection", "table_or_figure", "page", 
-    "paragraph_or_item", "age_group", "therapy_direction", "population_qualifiers", 
-    "treatment_phase", "analyte", "measurement_name", "unit", "assay_or_lab_context", 
-    "recommendation_type", "comparison_operator", "lower_bound", "upper_bound", 
-    "single_threshold", "non_numeric_instruction", "route", "formulation", 
-    "dosing_interval", "specimen_timing", "time_since_dose_or_application", 
-    "short_source_excerpt", "faithful_paraphrase", "required_context", "unknowns", 
-    "claims_not_supported", "comparison_group", "comparable_status", 
-    "noncomparability_reason", "extracted_by", "extraction_date", "verification_status", 
+    "recommendation_id", "source_id", "extraction_note_id", "original_or_adapted",
+    "upstream_source_id", "section", "subsection", "table_or_figure", "page",
+    "paragraph_or_item", "age_group", "therapy_direction", "population_qualifiers",
+    "treatment_phase", "analyte", "measurement_name", "unit", "assay_or_lab_context",
+    "recommendation_type", "comparison_operator", "lower_bound", "upper_bound",
+    "single_threshold", "non_numeric_instruction", "route", "formulation",
+    "dosing_interval", "specimen_timing", "time_since_dose_or_application",
+    "short_source_excerpt", "faithful_paraphrase", "required_context", "unknowns",
+    "claims_not_supported", "comparison_group", "comparable_status",
+    "noncomparability_reason", "extracted_by", "extraction_date", "verification_status",
     "human_verified_by", "human_verification_date", "another_review_needed"
 ]
 
@@ -70,6 +70,7 @@ def parse_decimal(val):
 def is_valid_date(val):
     v = val.strip()
     if not v: return False
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", v): return False
     try:
         datetime.strptime(v, "%Y-%m-%d")
         return True
@@ -86,7 +87,7 @@ class Validator:
         self.rec_ids = set()
         self.ext_ids = set()
         self.source_verification = {}
-        
+
     def log_error(self, file, row, id_val, field, msg):
         disp_id = id_val.strip() if id_val.strip() else "<blank>"
         self.errors.append(f"{file} row {row} (ID: {disp_id}) field '{field}': {msg}")
@@ -94,17 +95,17 @@ class Validator:
     def run(self):
         self.sources_rows = self.read_and_validate_header(self.sources_path, SOURCES_HEADER)
         self.recs_rows = self.read_and_validate_header(self.recs_path, RECOMMENDATIONS_HEADER)
-        
+
         if self.sources_rows is not None:
             for i, row in enumerate(self.sources_rows, start=2):
                 self.validate_source_row(row, i)
-        
+
         if self.recs_rows is not None:
             for i, row in enumerate(self.recs_rows, start=2):
                 self.validate_rec_row(row, i)
-        
+
         self.validate_post_process()
-        
+
         return len(self.errors) == 0
 
     def read_and_validate_header(self, path, expected_header):
@@ -137,7 +138,7 @@ class Validator:
             self.log_error(self.sources_path, row_idx, src_id, "source_id", "Duplicate ID")
         if src_id:
             self.source_ids.add(src_id)
-        
+
         self.source_verification[src_id] = row['verification_status'].strip()
 
         required_source_fields = [
@@ -145,7 +146,7 @@ class Validator:
             "publication_year", "official_url", "access_date", "population_scope",
             "geographic_scope", "source_status", "correction_status", "verification_status"
         ]
-        
+
         for field in required_source_fields:
             if not row[field].strip():
                 self.log_error(self.sources_path, row_idx, src_id, field, "Cannot be blank")
@@ -164,7 +165,7 @@ class Validator:
 
         if row['document_type'].strip() == 'other' and not row['source_notes'].strip():
             self.log_error(self.sources_path, row_idx, src_id, "source_notes", "Required when document_type is other")
-            
+
         if row['geographic_scope'].strip() == 'national' and not row['source_notes'].strip():
             self.log_error(self.sources_path, row_idx, src_id, "source_notes", "Required when geographic_scope is national")
 
@@ -206,15 +207,18 @@ class Validator:
             "claims_not_supported", "comparable_status", "extracted_by",
             "extraction_date", "verification_status", "another_review_needed"
         ]
-        
+
         for field in required_rec_fields:
             if not row[field].strip():
                 self.log_error(self.recs_path, row_idx, rec_id, field, "Cannot be blank")
-        
+
         src_id = row['source_id'].strip()
-        if src_id and src_id not in self.source_ids:
-            self.log_error(self.recs_path, row_idx, rec_id, "source_id", "Foreign key missing")
-            
+        if src_id:
+            if not re.match(r"^SRC\d{4}$", src_id):
+                self.log_error(self.recs_path, row_idx, rec_id, "source_id", "Invalid format")
+            elif src_id not in self.source_ids:
+                self.log_error(self.recs_path, row_idx, rec_id, "source_id", "Foreign key missing")
+
         ext_id = row['extraction_note_id'].strip()
         if ext_id and not re.match(r"^EXT\d{4}$", ext_id):
             self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Invalid format")
@@ -222,10 +226,10 @@ class Validator:
             self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Duplicate ID")
         if ext_id:
             self.ext_ids.add(ext_id)
-        
+
         if ext_id and rec_id:
             self.check_evidence_note(ext_id, rec_id, row_idx)
-            
+
         ext_date = row['extraction_date'].strip()
         if ext_date and not is_valid_date(ext_date):
             self.log_error(self.recs_path, row_idx, rec_id, "extraction_date", "Invalid date format")
@@ -237,15 +241,18 @@ class Validator:
 
         oa = row['original_or_adapted'].strip()
         up_id = row['upstream_source_id'].strip()
+
+        if up_id:
+            if not re.match(r"^SRC\d{4}$", up_id):
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Invalid format")
+            elif up_id not in self.source_ids:
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Foreign key missing")
+            elif up_id == src_id:
+                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Self-referential")
+
         if oa in ('adapted', 'reproduced', 'derived'):
             if not up_id:
                 self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", f"Required when original_or_adapted is {oa}")
-            elif not re.match(r"^SRC\d{4}$", up_id):
-                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Invalid format")
-            elif up_id == src_id:
-                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Self-referential")
-            elif up_id not in self.source_ids:
-                self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Foreign key missing")
         elif oa in ('original', 'not_applicable'):
             if up_id:
                 self.log_error(self.recs_path, row_idx, rec_id, "upstream_source_id", "Must be blank")
@@ -269,7 +276,7 @@ class Validator:
         # Structural rules
         op = row['comparison_operator'].strip()
         rt = row['recommendation_type'].strip()
-        
+
         lb = row['lower_bound'].strip()
         ub = row['upper_bound'].strip()
         st = row['single_threshold'].strip()
@@ -298,7 +305,7 @@ class Validator:
             self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", "upper_threshold requires less_than or less_than_or_equal")
         if rt == 'lower_threshold' and op not in ('greater_than', 'greater_than_or_equal'):
             self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", "lower_threshold requires greater_than or greater_than_or_equal")
-        
+
         qual_types = {'physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction', 'not_specified'}
         if rt in qual_types:
             if lb or ub or st:
@@ -306,7 +313,7 @@ class Validator:
 
         if rt in ('physiologic_range', 'laboratory_reference_range') and op != 'within_reference_range':
             self.log_error(self.recs_path, row_idx, rec_id, "recommendation_type", f"{rt} requires within_reference_range")
-            
+
         req_non_numeric = {'physiologic_range', 'laboratory_reference_range', 'monitoring_frequency', 'specimen_timing', 'qualitative_instruction'}
         if rt in req_non_numeric:
             if not row['non_numeric_instruction'].strip():
@@ -316,7 +323,7 @@ class Validator:
         vstatus = row['verification_status'].strip()
         h_ver_by = row['human_verified_by'].strip()
         h_ver_date = row['human_verification_date'].strip()
-        
+
         if vstatus == 'verified':
             if not h_ver_by:
                 self.log_error(self.recs_path, row_idx, rec_id, "human_verified_by", "Required when verified")
@@ -341,20 +348,20 @@ class Validator:
         if not os.path.isfile(path):
             self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Evidence note missing: {path}")
             return
-        
+
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
-            
+
             # Find first nonblank line
             nonblank_lines = [l.strip() for l in lines if l.strip()]
             if not nonblank_lines:
                 self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note is empty")
                 return
-            
+
             if nonblank_lines[0] != f"# Extraction Note: {ext_id}":
                 self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note missing correct # Extraction Note title on first line")
-                
+
             heading_indices = {}
             for i, line in enumerate(nonblank_lines):
                 if line.startswith("## "):
@@ -362,16 +369,16 @@ class Validator:
                         self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Duplicate heading: {line}")
                     else:
                         heading_indices[line] = i
-            
+
             for sec in REQUIRED_SECTIONS:
                 if sec not in heading_indices:
                     self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", f"Evidence note missing section: {sec}")
-            
+
             # Check order of required headings
             found_req_headings = [h for h in nonblank_lines if h in REQUIRED_SECTIONS]
             if found_req_headings != REQUIRED_SECTIONS:
                 self.log_error(self.recs_path, row_idx, rec_id, "extraction_note_id", "Evidence note required headings are out of order")
-            
+
             # Check Recommendation ID is within the Recommendation section
             if "## Recommendation" in heading_indices:
                 start_idx = heading_indices["## Recommendation"]
@@ -403,13 +410,13 @@ def get_analysis_eligible_recommendations(recs_path):
     eligible = []
     if not os.path.isfile(recs_path):
         raise FileNotFoundError(f"Recommendations file not found: {recs_path}")
-        
+
     with open(recs_path, 'r', encoding='utf-8') as f:
         reader = csv.reader(f)
         header = next(reader, None)
         if header != RECOMMENDATIONS_HEADER:
             raise ValueError(f"Malformed recommendations header in {recs_path}")
-            
+
         for row in reader:
             if len(row) != len(RECOMMENDATIONS_HEADER):
                 raise ValueError(f"Malformed row in {recs_path}")
@@ -431,7 +438,7 @@ def main():
             for e in v.errors:
                 print(e, file=sys.stderr)
             sys.exit(1)
-            
+
         sys.exit(0)
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
