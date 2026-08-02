@@ -10,16 +10,14 @@ from scripts.validate_data import Validator, SOURCES_HEADER, RECOMMENDATIONS_HEA
 
 class TestValidation(unittest.TestCase):
     def setUp(self):
-        self.tdir = os.path.join(os.path.dirname(__file__), 'tmp_data')
-        os.makedirs(self.tdir, exist_ok=True)
-        self.sources_path = os.path.join(self.tdir, 'sources.csv')
-        self.recs_path = os.path.join(self.tdir, 'recs.csv')
-        self.ev_dir = os.path.join(self.tdir, 'evidence-notes')
-        os.makedirs(self.ev_dir, exist_ok=True)
+        self.tdir = tempfile.TemporaryDirectory()
+        self.sources_path = os.path.join(self.tdir.name, 'sources.csv')
+        self.recs_path = os.path.join(self.tdir.name, 'recs.csv')
+        self.ev_dir = os.path.join(self.tdir.name, 'evidence-notes')
+        os.makedirs(self.ev_dir)
 
     def tearDown(self):
-        import shutil
-        shutil.rmtree(self.tdir, ignore_errors=True)
+        self.tdir.cleanup()
 
     def write_csv(self, path, header, rows):
         with open(path, 'w', newline='', encoding='utf-8') as f:
@@ -577,12 +575,12 @@ Recommendation ID: {rec_id}
 
     def test_48_existing_estradiol_total_testosterone_remains_valid(self):
         self.write_csv(self.sources_path, SOURCES_HEADER, [
-            self.get_valid_source_row({"source_id": "EXT0001"}),
-            self.get_valid_source_row({"source_id": "EXT0002"})
+            self.get_valid_source_row({"source_id": "SRC9999"})
         ])
         self.write_csv(self.recs_path, RECOMMENDATIONS_HEADER, [
             self.get_valid_rec_row({
-                "source_id": "EXT0001",
+                "source_id": "SRC9999",
+                "extraction_note_id": "EXT0001",
                 "recommendation_id": "REC0001",
                 "analyte": "estradiol",
                 "recommendation_type": "target_interval",
@@ -592,7 +590,8 @@ Recommendation ID: {rec_id}
                 "unit": "pg/mL"
             }),
             self.get_valid_rec_row({
-                "source_id": "EXT0002",
+                "source_id": "SRC9999",
+                "extraction_note_id": "EXT0002",
                 "recommendation_id": "REC0002",
                 "analyte": "total_testosterone",
                 "recommendation_type": "upper_threshold",

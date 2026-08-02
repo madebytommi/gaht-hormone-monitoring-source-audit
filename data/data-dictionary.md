@@ -378,7 +378,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 ### `noncomparability_reason`
 * **Purpose**: Reason if not directly comparable.
 * **Data type**: String
-* **Requirement**: Conditionally required (Required if `comparable_status` is `comparable_with_qualification` for `testosterone_unspecified`).
+* **Requirement**: Conditionally required (Required if `comparable_status=not_comparable`; or if `analyte=testosterone_unspecified` and `comparable_status=comparable_with_qualification`).
 * **Blank-value behavior**: Leave blank if directly comparable.
 
 ### `extracted_by`
