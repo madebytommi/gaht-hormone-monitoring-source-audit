@@ -3,3 +3,5 @@
 .agent/
 .env
 .scratchpad/
+.DS_Store
+**/.DS_Store
