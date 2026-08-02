@@ -1,0 +1,5 @@
+# Antigravity Local Agent Context & Scratchpad
+.agents/
+.agent/
+.env
+.scratchpad/

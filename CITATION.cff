@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software or data in your research, please cite it as below."
+authors:
+  - family-names: "Doe"
+    given-names: "Jane"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+title: "GAHT Reference Range Analysis"
+version: 1.0.0
+date-released: 2026-08-02
+url: "https://github.com/placeholder/gaht-target-ranges-analysis"
+abstract: "An open-research script and dataset that models and harmonizes target serum hormone ranges across 3 clinical protocols (Endocrine Society 2017, WPATH SOC 8 2022, UCSF 2016)."
