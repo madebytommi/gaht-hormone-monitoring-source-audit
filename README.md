@@ -1,4 +1,4 @@
-# GAHT Hormone Monitoring Source Audit
+# Serum Hormone Monitoring Recommendations in Selected GAHT Guidance Documents: A Reproducible Source Audit
 
 > **STATUS NOTICE:** This project is in the protocol-development and source-verification stage. No clinical findings, recommended hormone ranges, consensus conclusions, or comparative results have been established.
 >
