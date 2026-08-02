@@ -14,6 +14,19 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 - **Analysis Rules**: Only `verified` records may enter analysis or visualization. Non-comparable recommendations must not be forced into shared interval comparisons.
 - **Controlled Vocabularies**: Do not invent new controlled-vocabulary values that conflict with `PROTOCOL.md`. If a necessary value is undefined, the field must be documented as pending a protocol amendment.
 
+## Pending Controlled-Vocabulary Decisions
+
+The following fields will require a protocol amendment before their exact controlled vocabularies can be automated and enforced:
+- `document_type`
+- `population_scope`
+- `geographic_scope`
+- `source_status`
+- `correction_status`
+- `age_group`
+- `therapy_direction`
+- `analyte`
+- `another_review_needed`
+
 ---
 
 ## File: `data/sources.csv`
@@ -41,6 +54,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: The type of document (e.g., guideline, standard of care).
 * **Data type**: String
 * **Requirement**: Required
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Must not be blank.
 
 ### `version`
@@ -78,24 +92,28 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: The intended population for the source.
 * **Data type**: String
 * **Requirement**: Required
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Must not be blank.
 
 ### `geographic_scope`
 * **Purpose**: The geographic applicability of the document.
 * **Data type**: String
 * **Requirement**: Required
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Must not be blank.
 
 ### `source_status`
 * **Purpose**: Status of the document (e.g., current, superseded).
 * **Data type**: String
 * **Requirement**: Required
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Must not be blank.
 
 ### `correction_status`
 * **Purpose**: Whether corrections, updates, or corrigenda have been issued and incorporated.
 * **Data type**: String
 * **Requirement**: Required
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Must not be blank.
 
 ### `upstream_source_ids`
@@ -115,7 +133,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Status of the source metadata extraction.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `pending`, `verified`, `needs_revision`, `excluded`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`pending`, `verified`, `needs_revision`, `excluded`).
 * **Blank-value behavior**: Must not be blank. AI-assisted records start as `pending`.
 
 ### `human_verified_by`
@@ -160,7 +178,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Whether the recommendation is original to the source or references another document.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `original`, `adapted`, `reproduced`, `derived`, `unclear`, `not_applicable`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`original`, `adapted`, `reproduced`, `derived`, `unclear`, `not_applicable`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `upstream_source_id`
@@ -203,13 +221,14 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Specified age group (e.g., adult).
 * **Data type**: String
 * **Requirement**: Required
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Use `not_specified` if missing.
 
 ### `therapy_direction`
 * **Purpose**: Direction of hormone therapy.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Includes Feminizing hormone therapy, Masculinizing hormone therapy. (Expand via amendment if necessary).
+* **Controlled values**: Not yet defined; exact controlled vocabulary is pending a protocol amendment. No value should be enforced until that amendment is approved.
 * **Blank-value behavior**: Must not be blank.
 
 ### `population_qualifiers`
@@ -222,14 +241,14 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: The phase of treatment the monitoring applies to.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `initiation`, `dose_adjustment`, `stable_maintenance`, `general`, `not_specified`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`initiation`, `dose_adjustment`, `stable_maintenance`, `general`, `not_specified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `analyte`
 * **Purpose**: The hormone being measured.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: Includes Serum estradiol, Serum total testosterone. (Expand via amendment if necessary).
+* **Controlled values**: Not yet defined; exact stored values are pending a protocol amendment. The project scope is currently limited to serum estradiol and serum total testosterone.
 * **Blank-value behavior**: Must not be blank.
 
 ### `measurement_name`
@@ -254,14 +273,14 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Categorization of the instruction.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `target_interval`, `upper_threshold`, `lower_threshold`, `physiologic_range`, `laboratory_reference_range`, `monitoring_frequency`, `specimen_timing`, `qualitative_instruction`, `not_specified`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`target_interval`, `upper_threshold`, `lower_threshold`, `physiologic_range`, `laboratory_reference_range`, `monitoring_frequency`, `specimen_timing`, `qualitative_instruction`, `not_specified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `comparison_operator`
 * **Purpose**: Operator relating the threshold or interval.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `less_than`, `less_than_or_equal`, `greater_than`, `greater_than_or_equal`, `between`, `within_reference_range`, `approximately`, `not_applicable`, `not_specified`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`less_than`, `less_than_or_equal`, `greater_than`, `greater_than_or_equal`, `between`, `within_reference_range`, `approximately`, `not_applicable`, `not_specified`).
 * **Blank-value behavior**: Must not be blank.
 
 ### `lower_bound`
@@ -310,7 +329,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Timing of specimen collection relative to dosage.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `peak`, `trough`, `mid_cycle`, `before_next_dose`, `after_application`, `any_time`, `route_specific`, `not_specified`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`peak`, `trough`, `mid_cycle`, `before_next_dose`, `after_application`, `any_time`, `route_specific`, `not_specified`).
 * **Blank-value behavior**: Must not be blank. Use `not_specified` if missing.
 
 ### `time_since_dose_or_application`
@@ -359,7 +378,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Assessment of whether this can be safely compared to other records.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `directly_comparable`, `comparable_with_qualification`, `not_comparable`, `undetermined`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`directly_comparable`, `comparable_with_qualification`, `not_comparable`, `undetermined`).
 * **Validation notes**: Non-comparable recommendations must not be forced into shared interval comparisons.
 * **Blank-value behavior**: Must not be blank. Starts as `undetermined`.
 
@@ -386,7 +405,7 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Status of the extracted record against the source text.
 * **Data type**: String
 * **Requirement**: Required
-* **Controlled values**: `pending`, `verified`, `needs_revision`, `excluded`
+* **Controlled values**: Already defined in `PROTOCOL.md` (`pending`, `verified`, `needs_revision`, `excluded`).
 * **Blank-value behavior**: Must not be blank. AI-assisted records start as `pending`.
 
 ### `human_verified_by`
@@ -406,4 +425,5 @@ This project adheres to the research rules defined in `PROTOCOL.md`.
 * **Purpose**: Flag indicating if further review or dispute resolution is required.
 * **Data type**: String
 * **Requirement**: Optional
+* **Controlled values**: Not yet defined; pending a protocol amendment.
 * **Blank-value behavior**: Leave blank if no additional review is needed.
